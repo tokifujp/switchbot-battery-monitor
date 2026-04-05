@@ -5,6 +5,7 @@ export interface Env {
   SWITCHBOT_SECRET: string;
   DISCORD_WEBHOOK_URL: string;
   BATTERY_THRESHOLD: string; // 例: "20"
+  MONITORED_DEVICE_IDS: string; // カンマ区切り 例: "B0:E9:FE:A4:77:89,B0:E9:FE:9D:68:5B"
 }
 
 // SwitchBot API 認証ヘッダー生成
@@ -37,11 +38,11 @@ async function getDevices(token: string, secret: string) {
 async function getDeviceStatus(
   token: string,
   secret: string,
-  deviceId: string
+  deviceId: string,
 ) {
   const res = await fetch(
     `https://api.switch-bot.com/v1.1/devices/${deviceId}/status`,
-    { headers: buildAuthHeaders(token, secret) }
+    { headers: buildAuthHeaders(token, secret) },
   );
   const json = (await res.json()) as any;
   return json.body ?? null;
@@ -56,27 +57,27 @@ async function notifyDiscord(webhookUrl: string, message: string) {
   });
 }
 
-// ロック系デバイスかどうか判定
-function isLockDevice(deviceType: string): boolean {
-  return deviceType.toLowerCase().includes("lock");
-}
-
 async function checkBatteries(env: Env) {
   const threshold = parseInt(env.BATTERY_THRESHOLD ?? "20", 10);
+  const monitoredIds = env.MONITORED_DEVICE_IDS.split(",").map((id) =>
+    id.trim(),
+  );
   const devices = await getDevices(env.SWITCHBOT_TOKEN, env.SWITCHBOT_SECRET);
 
-  const lockDevices = devices.filter((d: any) => isLockDevice(d.deviceType));
+  const targetDevices = devices.filter((d: any) =>
+    monitoredIds.includes(d.deviceId),
+  );
 
-  if (lockDevices.length === 0) {
-    console.log("ロックデバイスが見つかりませんでした");
+  if (targetDevices.length === 0) {
+    console.log("対象デバイスが見つかりませんでした");
     return;
   }
 
-  for (const device of lockDevices) {
+  for (const device of targetDevices) {
     const status = await getDeviceStatus(
       env.SWITCHBOT_TOKEN,
       env.SWITCHBOT_SECRET,
-      device.deviceId
+      device.deviceId,
     );
 
     if (!status) continue;
@@ -86,7 +87,7 @@ async function checkBatteries(env: Env) {
 
     if (battery !== undefined && battery <= threshold) {
       const message =
-        `🔋 **SwitchBot ロック バッテリー低下** 🔴\n` +
+        `🔋 **SwitchBot バッテリー低下** 🔴\n` +
         `**デバイス:** ${device.deviceName}\n` +
         `**残量:** ${battery}%\n` +
         `**閾値:** ${threshold}% 以下\n` +

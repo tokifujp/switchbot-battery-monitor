@@ -1,11 +1,11 @@
 # switchbot-battery-monitor
 
-SwitchBot ロックのバッテリー残量を監視し、閾値を下回ったら Discord に通知する Cloudflare Worker。
+SwitchBot デバイスのバッテリー残量を監視し、閾値を下回ったら Discord に通知する Cloudflare Worker。
 
 ## 概要
 
 - Cloudflare Workers の Cron トリガーで毎日定時に SwitchBot API をポーリング
-- ロック系デバイスのバッテリーが指定閾値以下になったら Discord Webhook で通知
+- 指定したデバイスのバッテリーが閾値以下になったら Discord Webhook で通知
 - `/trigger` エンドポイントで手動実行も可能
 
 ## セットアップ
@@ -20,26 +20,37 @@ npm install
 
 SwitchBot アプリ → プロフィール → 一番下「開発者向けオプション」からトークンとシークレットを取得。
 
-### 3. Discord Webhook URL の取得
+### 3. 監視対象デバイス ID の確認
+
+SwitchBot アプリのデバイス詳細画面、または API のデバイス一覧から確認できる。
+
+### 4. Discord Webhook URL の取得
 
 通知したいチャンネルの設定 → 連携サービス → ウェブフック → 新しいウェブフック。
 
-### 4. シークレット登録
+### 5. シークレット登録
 
 ```bash
 wrangler secret put SWITCHBOT_TOKEN
 wrangler secret put SWITCHBOT_SECRET
 wrangler secret put DISCORD_WEBHOOK_URL
-wrangler secret put BATTERY_THRESHOLD   # 省略時は 20 (%) がデフォルト
+wrangler secret put MONITORED_DEVICE_IDS  # カンマ区切りで複数指定可
+wrangler secret put BATTERY_THRESHOLD     # 省略時は 20 (%) がデフォルト
 ```
 
-### 5. デプロイ
+`MONITORED_DEVICE_IDS` の例：
+
+```
+**:**:**:**:**:**,**:**:**:**:**:**
+```
+
+### 6. デプロイ
 
 ```bash
 npm run deploy
 ```
 
-### 6. 動作確認
+### 7. 動作確認
 
 ```bash
 # 手動トリガー
@@ -61,7 +72,7 @@ crons = ["0 0 * * *"]  # 0:00 UTC = 9:00 JST
 ## 通知例
 
 ```
-🔋 SwitchBot ロック バッテリー低下 🔴
+🔋 SwitchBot バッテリー低下 🔴
 デバイス: ロックUltra 5B
 残量: 15%
 閾値: 20% 以下
@@ -75,4 +86,5 @@ crons = ["0 0 * * *"]  # 0:00 UTC = 9:00 JST
 | `SWITCHBOT_TOKEN` | SwitchBot API トークン | 必須 |
 | `SWITCHBOT_SECRET` | SwitchBot API シークレット | 必須 |
 | `DISCORD_WEBHOOK_URL` | Discord Webhook URL | 必須 |
+| `MONITORED_DEVICE_IDS` | 監視対象のデバイス ID（カンマ区切り） | 必須 |
 | `BATTERY_THRESHOLD` | 通知する残量の閾値 (%) | `20` |
